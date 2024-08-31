@@ -31,8 +31,9 @@ class LHGConv2d(nn.Module):
             
         else:
             x_j = batched_index_select(x, edge_index[0])
-        x_j, _ = torch.max(x_j - x_i, -1, keepdim=True)
-
+        #x_j, _ = torch.max(x_j - x_i, -1, keepdim=True)
+        x_diff = torch.sub(x_j, x_i)
+        x_j,_ = torch.max(x_diff, -1, keepdim=True)
         centroids,weights = self.get_centroids(x,num_clusters)
 
         
@@ -46,9 +47,10 @@ class LHGConv2d(nn.Module):
 
         x_j_cluster = batched_index_select(centroids.unsqueeze(-1), edge_idx[0])
         x_i_cluster = batched_index_select(x, edge_idx[1])
+        clus_diff = torch.sub(x_j_cluster, x_i_cluster)
+        x_j_cluster,_ = torch.max(clus_diff, -1, keepdim=True)
+        #x_j_cluster,_ = torch.max(x_j_cluster - x_i_cluster, -1, keepdim=True)
         
-        x_j_cluster,_ = torch.max(x_j_cluster - x_i_cluster, -1, keepdim=True)
-
         x = torch.cat([x.unsqueeze(2), x_j.unsqueeze(2),x_j_cluster.unsqueeze(2)], dim=2).reshape(b, 3 * c, n, -1)
         
         return self.nn(x)
@@ -230,7 +232,7 @@ class Grapher(nn.Module):
         self.cluster_ratio = cluster_ratio
         self.top_clusters = math.ceil(num_knn * cluster_ratio)
         if relative_pos:
-            print('using relative_pos')
+            
             relative_pos_tensor = torch.from_numpy(np.float32(get_2d_relative_pos_embed(in_channels,
                 int(n**0.5)))).unsqueeze(0).unsqueeze(1)
             relative_pos_tensor = F.interpolate(

@@ -7,7 +7,7 @@ import torchaudio
 import unittest
 import json 
 import csv
-
+import h5py 
 
 def label_to_index(label_csv):
     index_dict = {}
@@ -21,7 +21,7 @@ def label_to_index(label_csv):
 
 class FSDDataset(Dataset):
 
-    def __init__(self,data_json,conf,mode=None,label_csv=None):
+    def __init__(self,data_json,conf,mode=None,label_csv=None,hdf5_filename=None):
         super().__init__()
         with open(data_json, 'r') as fp:
             data_json = json.load(fp)
@@ -42,16 +42,29 @@ class FSDDataset(Dataset):
         self.timem = conf['timem']
         self.norm_mean = conf['norm_mean']
         self.norm_std = conf['norm_std']
-    
+        self.hdf5_filename = hdf5_filename
+        self.hdf5_file = None
+        self.freqm_aug = torchaudio.transforms.FrequencyMasking(self.freqm)
+        self.timem_aug = torchaudio.transforms.TimeMasking(self.timem)
+    def _ensure_hdf5_open(self):
+        if self.hdf5_file is None:
+            self.hdf5_file = h5py.File(self.hdf5_filename, 'r')
+            self.total_samples = len(self.hdf5_file.keys())
+
     def __len__(self):
         return len(self.data)
     
+   
     def wav_2_fbank(self,filename,filename2=None):
-
-        if filename2 == None:
+        
+        if filename2 is  None:
             
             waveform,sr = torchaudio.load(filename)
-            
+            #waveform = filename
+            #waveform = filename
+            if waveform.dim() == 1:
+             # If the waveform is 1D, add an extra dimension to make it 2D
+                waveform = waveform.unsqueeze(0)
             transform = torchaudio.transforms.Resample(sr,self.sr)
             waveform = transform(waveform)
             waveform = waveform - waveform.mean()
@@ -59,8 +72,17 @@ class FSDDataset(Dataset):
         else:
             
             waveform1,sr = torchaudio.load(filename)
-            
+            #waveform1 = filename
+            #waveform1 = filename
+            #waveform2 = filename2
+            if waveform1.dim() == 1:
+             # If the waveform is 1D, add an extra dimension to make it 2D
+                waveform1 = waveform1.unsqueeze(0)
             waveform2,sr = torchaudio.load(filename2)
+            #waveform2 = filename2
+            if waveform2.dim() == 1:
+             # If the waveform is 1D, add an extra dimension to make it 2D
+                waveform2 = waveform2.unsqueeze(0)
             transform = torchaudio.transforms.Resample(sr,self.sr)
             waveform1 = transform(waveform1)
             waveform2 = transform(waveform2)
@@ -101,17 +123,32 @@ class FSDDataset(Dataset):
 
     
     def __getitem__(self,idx):
-        
+        self._ensure_hdf5_open()
+
         if self.mode == 'train':
             if random.random() < self.mixup:
                 # do mixup
+                #audio_key = f'audio_{idx}'
                 
                 mixup_idx = random.randint(0,len(self.data)-1)
+                #audio_key2 = f'audio_{mixup_idx}'
+                #label2 = self.hdf5_file[audio_key2].attrs['labels']
+                #label = self.hdf5_file[audio_key].attrs['labels']
+                #wav_file1 = torch.from_numpy(self.hdf5_file[audio_key][:])
+                #wav_file2 = torch.from_numpy(self.hdf5_file[audio_key2][:])
+
+                #with h5py.File(self.data[idx]['wav'], 'r') as f1, h5py.File(self.data[mixup_idx]['wav'], 'r') as f2:
+                #    wav_file1 = torch.from_numpy(f1['audio'][:])
+                #    wav_file2 = torch.from_numpy(f2['audio'][:])
+                     
                 wav_file1 = self.data[idx]['wav']
                 wav_file2 = self.data[mixup_idx]['wav']
                 fbank,mix_lambda = self.wav_2_fbank(wav_file1,wav_file2)
                 label = self.data[idx]['labels']
                 label2 = self.data[mixup_idx]['labels']
+
+                #fbank,mix_lambda = self.wav_2_fbank(wav_file1,wav_file2)
+                
                 label_list = np.zeros(self.num_labels)
                 for label_str in label.split(','):
                     label_list[self.index_dict[label_str]] += mix_lambda
@@ -121,29 +158,50 @@ class FSDDataset(Dataset):
             
             else:
                 # no mixup
+                #with h5py.File(self.data[idx]['wav'], 'r') as f1:
+                #    wav_file = torch.from_numpy(f1['audio'][:])
+                #audio_key = audio_key = f'audio_{idx}'
                 
+                
+                #label = self.hdf5_file[audio_key].attrs['labels']
+                
+               # wav_file = torch.from_numpy(self.hdf5_file[audio_key][:])
                 wav_file = self.data[idx]['wav']
+                
+                #wav_file = self.data[idx]['wav']
                 fbank,_ = self.wav_2_fbank(wav_file)
                 label = self.data[idx]['labels']
+                
+                
+                #wav_file = self.data[idx]['wav']
+                #fbank,_ = self.wav_2_fbank(wav_file)
+                
                 label_list = np.zeros(self.num_labels)
                 for label_str in label.split(','):
                     label_list[self.index_dict[label_str]] += 1
                 label_list = torch.FloatTensor(label_list)
             
-            freqm = torchaudio.transforms.FrequencyMasking(self.freqm)
-            timem = torchaudio.transforms.TimeMasking(self.timem)
+            
             fbank = torch.transpose(fbank,0,1)
             fbank = fbank.unsqueeze(0)
-            fbank = freqm(fbank)
-            fbank = timem(fbank)
+            fbank = self.freqm_aug(fbank)
+            fbank = self.timem_aug(fbank)
             fbank = fbank.squeeze(0)
             fbank = torch.transpose(fbank,0,1)
             fbank = (fbank - self.norm_mean)/self.norm_std
             return fbank,label_list
         else:
+            #with h5py.File(self.data[idx]['wav'], 'r') as f1:
+            #        wav_file = torch.from_numpy(f1['audio'][:])
+            #audio_key = f'audio_{idx}'    
+            #label = self.hdf5_file[audio_key].attrs['labels']    
+            #wav_file = torch.from_numpy(self.hdf5_file[audio_key][:])
             wav_file = self.data[idx]['wav']
             fbank,_ = self.wav_2_fbank(wav_file)
             label = self.data[idx]['labels']
+            #wav_file = self.data[idx]['wav']
+            #fbank,_ = self.wav_2_fbank(wav_file)
+            #label = self.data[idx]['labels']
             label_list = np.zeros(self.num_labels)
             for label_str in label.split(','):
                 label_list[self.index_dict[label_str]] += 1

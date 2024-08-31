@@ -4,14 +4,14 @@
 
 # @package _global_
 root_dir: ${oc.env:PROJECT_ROOT}
-exp_dir: /data/scratch/acw572
+exp_dir: /jmain02/home/J2AD007/txk47/sxs27-txk47/LHGNN
 
 
 # path to data directory
-data_dir: /data/EECS-MachineListeningLab/datasets/AudioSet
-meta_dir: /data/EECS-MachineListeningLab/shubhr/hgann
+data_dir: /jmain02/home/J2AD007/txk47/sxs27-txk47/datasets/audioset
+meta_dir: ${paths.exp_dir}/datafiles
 # path to logging directory
-log_dir: ${paths.exp_dir}/LHGNN/logs/
+log_dir: ${paths.exp_dir}/logs/
 
 # path to output directory, created dynamically by hydra
 # path generation pattern is specified in `configs/hydra/default.yaml`
@@ -20,3 +20,4 @@ output_dir: ${hydra:runtime.output_dir}
 
 # path to working directory
 work_dir: ${hydra:runtime.cwd}
+

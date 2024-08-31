@@ -105,13 +105,13 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         "callbacks": callbacks,
         "trainer": trainer,
     }
-    if logger:
-        log.info("Logging hyperparameters!")
-        log_hyperparameters(object_dict)
+    #if logger:
+    #    log.info("Logging hyperparameters!")
+    #    log_hyperparameters(object_dict)
     
 
     log.info("Starting training!")
-
+    
     trainer.fit(model=model, datamodule=datamodule)
 
     train_metrics = trainer.callback_metrics
@@ -121,13 +121,18 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     if cfg.get("eval"):
         log.info("Evaluating  for single model!")
-        ckpt_path = trainer.checkpoint_callback.best_model_path
+        if cfg.get("dat") == 'audioset':
+            ckpt_path = trainer.checkpoint_callback.last_model_path
+        else:
+            ckpt_path = trainer.checkpoint_callback.best_model_path
+            
+        
         ckpt = torch.load(ckpt_path)
         model.load_state_dict(ckpt['state_dict'],strict=True)
         
-        test_results = trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
-        logging.info(f"Test results: {test_results['mAP']}")
-        log.info(f"Test mAP: {test_results['mAP']}")
+        trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+        test_metrics = trainer.callback_metrics
+        
     # Weighted Average Model 
         
     if cfg.get("wa"):
@@ -152,8 +157,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         model.load_state_dict(own_state)
         
         test_results_wa = trainer.test(model=model, datamodule=datamodule)
-        log.info(f"Test results from weighted average model: {test_results_wa['mAP']}")
-        logging.info(f"Test mAP from weighted average model: {test_results_wa['mAP']}")
+        log.info(f"Test results from weighted average model: {test_results_wa['test_mAP']}")
+        logging.info(f"Test mAP from weighted average model: {test_results_wa['test_mAP']}")
         torch.save(model.net.state_dict(),os.path.join(ckpt_dir,'wa.pth.tar'))
     
     metrics = trainer.callback_metrics

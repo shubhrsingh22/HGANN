@@ -61,8 +61,8 @@ class FSDDataModule(LightningDataModule):
         if not os.path.exists(self.json_path):
             os.mkdir(self.json_path)
         self.num_devices = int(num_devices)
-        self.train_json = self.json_path + 'fsd_tr_full.json'
-        self.val_json = self.json_path + 'fsd_val_full.json'
+        self.train_json = self.json_path + 'fsd_tr_full_jade.json'
+        self.val_json = self.json_path + 'fsd_val_full_jade.json'
         self.eval_json = self.json_path + 'fsd_eval_full.json'
         self.audio_conf = {'sr':sr,'fmin':fmin,'fmax':fmax,'num_mels':num_mels,'window_type':window_type,'target_len':target_len,'freqm':freqm,'timem':timem,'norm_mean':norm_mean,'norm_std':norm_std,'mixup':mixup} 
         self.persistent_workers = persistent_workers

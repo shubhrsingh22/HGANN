@@ -19,7 +19,7 @@ scheduler:
  
 net:
   _target_: src.models.components.LHGNN.LHGNN
-  k: 25 
+  k: 25
   act: 'gelu'
   norm: 'batch'
   bias: True
@@ -28,12 +28,12 @@ net:
   epsilon: 0.2
   drop_path: 0.1
   size: 's'
-  num_class: 200
+  num_class: 527
   emb_dims: 1024
   freq_num: 128
   time_num: 1024
   clusters: 50
-  cluster_ratio: 0.5
+  cluster_ratio: 0.4
   conv: 'lhg'
   #k_dpc: 9
   #cluster_method: 'soft-kmeans'
@@ -52,7 +52,7 @@ net:
 
 # compile model for faster training with pytorch 2.0
 compile: false
-loss: 'bce'
+loss: 'bcelogit'
 opt_warmup: True 
 learning_rate: 5e-4
 lr_rate:  [0.05, 0.02, 0.01,0.005,0.002,0.001,0.0005,0.0002]

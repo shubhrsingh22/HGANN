@@ -17,6 +17,7 @@ class AudioSetModule(LightningDataModule):
                  data_dir:str,
                  meta_path:str,
                  label_csv_pth:str,
+                 hdf_dir:str,
                  samplr_csv_pth:str,
                  balance_samplr:bool,
                  batch_size:int,
@@ -65,10 +66,14 @@ class AudioSetModule(LightningDataModule):
             os.mkdir(self.json_path)
         self.num_devices = int(num_devices)
         if self.subset == 'bal':
-            self.tr_json = self.json_path + 'audioset_bal_tr.json'
+            self.tr_json = self.json_path + 'audioset_bal_tr_jade.json'
+            self.tr_hdf =  os.path.join(hdf_dir,'bal_segments','bal_segments_16k.h5')
+            
         else:
             self.tr_json = self.json_path + 'audioset_all_tr.json'
-        self.eval_json = self.json_path + 'audioset_eval.json'
+            self.tr_hdf =  os.path.join(hdf_dir,'bal_segments','bal_segments_16k.h5')
+        self.eval_json = self.json_path + 'audioset_eval_jade.json'
+        self.eval_hdf =  os.path.join(hdf_dir,'eval_segments','eval_segments_16k.h5')
         
         self.audio_conf = {'sr':sr,'fmin':fmin,'fmax':fmax,'num_mels':num_mels,'window_type':window_type,'target_len':target_len,'freqm':freqm,'timem':timem,'norm_mean':norm_mean,'norm_std':norm_std,'mixup':mixup} 
         self.persistent_workers = persistent_workers
@@ -77,8 +82,8 @@ class AudioSetModule(LightningDataModule):
     
     def setup(self,stage: Optional[str] = None)-> None:
         
-        self.tr_dataset = FSDDataset(self.tr_json,self.audio_conf,mode='train',label_csv=self.label_csv_pth)
-        self.eval_dataset = FSDDataset(self.eval_json,self.audio_conf,mode='eval',label_csv=self.label_csv_pth)
+        self.tr_dataset = FSDDataset(self.tr_json,self.audio_conf,mode='train',label_csv=self.label_csv_pth,hdf5_filename=self.tr_hdf)
+        self.eval_dataset = FSDDataset(self.eval_json,self.audio_conf,mode='eval',label_csv=self.label_csv_pth,hdf5_filename=self.eval_hdf)
     
 
     def train_dataloader(self)-> DataLoader[Any]:
@@ -99,7 +104,6 @@ class AudioSetModule(LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            shuffle=self.sampler,
             persistent_workers=self.persistent_workers) 
     
     def val_dataloader(self)-> DataLoader[Any]:
@@ -111,9 +115,19 @@ class AudioSetModule(LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             shuffle=False,
-            sampler=self.sampler,
             persistent_workers=self.persistent_workers     
         )
+    
+    def test_dataloader(self)-> DataLoader[Any]:
+        self.sampler = None
+        return DataLoader(dataset=self.eval_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            shuffle=False,
+            persistent_workers=self.persistent_workers     
+        )
+
     
    
     

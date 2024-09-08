@@ -105,14 +105,17 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         "callbacks": callbacks,
         "trainer": trainer,
     }
-    #if logger:
-    #    log.info("Logging hyperparameters!")
-    #    log_hyperparameters(object_dict)
+   
     
 
     log.info("Starting training!")
+    if cfg.get("ckpt_path"):
+        log.info(f"Resuming training from {cfg.ckpt_path}")   
+        trainer.fit(model=model, datamodule=datamodule,ckpt_path=cfg.ckpt_path)
+    else:
+        log.info(f"Training from scratch")
+        trainer.fit(model=model, datamodule=datamodule)
     
-    trainer.fit(model=model, datamodule=datamodule)
 
     train_metrics = trainer.callback_metrics
     log.info(f"Training completed!")
@@ -121,16 +124,16 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     if cfg.get("eval"):
         log.info("Evaluating  for single model!")
-        if cfg.get("dat") == 'audioset':
-            ckpt_path = trainer.checkpoint_callback.last_model_path
-        else:
-            ckpt_path = trainer.checkpoint_callback.best_model_path
+        #if cfg.get("dat") == 'audioset':
+        #    ckpt_path = trainer.checkpoint_callback.last_model_path
+        #else:
+        #    ckpt_path = trainer.checkpoint_callback.best_model_path
             
-        
+        ckpt_path = '/jmain02/home/J2AD007/txk47/sxs27-txk47/LHGNN/checkpoint_bask/last.ckpt'
         ckpt = torch.load(ckpt_path)
         model.load_state_dict(ckpt['state_dict'],strict=True)
         
-        trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+        trainer.test(model=model, datamodule=datamodule)
         test_metrics = trainer.callback_metrics
         
     # Weighted Average Model 

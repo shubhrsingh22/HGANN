@@ -164,24 +164,44 @@ class TaggingModule(LightningModule):
     def on_validation_epoch_end(self)->None:
         "Lightning hook that is called when a validation epoch ends."
        
-        
         val_preds = torch.cat(self.val_predictions, dim=0)
         val_targets = torch.cat(self.val_targets, dim=0)
-        print(f'val preds shape: {val_preds.shape}')
-        print(f'val targets shape: {val_targets.shape}')
-        stats = calculate_stats(val_preds.cpu().detach().numpy(), val_targets.cpu().detach().numpy())
-        mAP = np.mean([stat['AP'] for stat in stats])
-        acc = stats[0]['acc']
-        self.val_mAP_best(mAP)
+        metric_dict = {'mAP': 0.0, 'acc': 0.0}
+        if torch.cuda.device_count() > 1:
+            gather_pred = [torch.zeros_like(val_preds) for _ in range(dist.get_world_size())]
+            gather_target = [torch.zeros_like(val_targets) for _ in range(dist.get_world_size())]
+            dist.barrier()
         
-        #avg_pres = self.ap.compute()
-        #print(avg_pres.shape)
-        self.log("val/mAP", mAP, on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
-        self.log("val/mAP_best", self.val_mAP_best.compute(), on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
-        #self.log("val/mAP",self.ap.compute().mean(),on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
+        if torch.cuda.device_count() > 1:
+            dist.all_gather(gather_pred, val_preds)
+            dist.all_gather(gather_target, val_targets)
+
+            if dist.get_rank() == 0:
+                gather_pred = torch.cat(gather_pred, dim=0).cpu().detach().numpy()
+                gather_target = torch.cat(gather_target, dim=0).cpu().detach().numpy()
+                stats = calculate_stats(gather_pred, gather_target)
+                mAP = np.mean([stat['AP'] for stat in stats])
+                metric_dict['mAP'] = mAP
+                #self.val_mAP_best(mAP)
+            dist.barrier()
+
+            #self.log("val/mAP", mAP , on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
+            self.val_mAP_best(metric_dict['mAP'])
+            self.log("val/mAP", metric_dict['mAP']*float(dist.get_world_size()), on_epoch=True, prog_bar=True,sync_dist=True)
+                #logging.info(f'Validation done for epoch {self.current_epoch}')
+            self.log("val/mAP_best", self.val_mAP_best.compute(), on_epoch=True, prog_bar=True,sync_dist=True)
+            
+        
+        else:
+            stats = calculate_stats(val_preds.cpu().detach().numpy(), val_targets.cpu().detach().numpy())
+            mAP = np.mean([stat['AP'] for stat in stats])
+            acc = stats[0]['acc']
+            self.val_mAP_best(mAP)
+            self.log("val/mAP", mAP, on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
+            self.log("val/mAP_best", self.val_mAP_best.compute(), on_step=False, on_epoch=True, prog_bar=True)
+        
         self.val_predictions.clear()
         self.val_targets.clear()
-        
         
 
         
@@ -202,20 +222,33 @@ class TaggingModule(LightningModule):
         "Lightning hook that is called when a test epoch ends."
         test_preds = torch.cat(self.test_predictions, dim=0)
         test_targets = torch.cat(self.test_targets, dim=0)
+        metric_dict = {'mAP': 0.0, 'acc': 0.0}
+        if torch.cuda.device_count() > 1:
+            gather_pred = [torch.zeros_like(test_preds) for _ in range(dist.get_world_size())]
+            gather_target = [torch.zeros_like(test_targets) for _ in range(dist.get_world_size())]
+            dist.barrier()
+            dist.all_gather(gather_pred, test_preds)
+            dist.all_gather(gather_target, test_targets)
+
+            if dist.get_rank() == 0:
+                gather_pred = torch.cat(gather_pred, dim=0).cpu().detach().numpy()
+                gather_target = torch.cat(gather_target, dim=0).cpu().detach().numpy()
+                stats = calculate_stats(gather_pred, gather_target)
+                mAP = np.mean([stat['AP'] for stat in stats])
+                metric_dict['mAP'] = mAP
+                self.test_mAP_best(metric_dict['mAP'])
+                self.log("test/mAP", metric_dict['mAP'], on_step=False, on_epoch=True, prog_bar=True,sync_dist=False)
+                #logging.info(f'Validation done for epoch {self.current_epoch}')
+                self.log("test/mAP_best", self.test_mAP_best.compute(), on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
+                #logging.info(f'logging on rank {dist.get_rank()}')
+                
+                
+        else:
+            stats = calculate_stats(test_preds.cpu().detach().numpy(), test_targets.cpu().detach().numpy())
+            mAP = np.mean([stat['AP'] for stat in stats])
+            acc = stats[0]['acc']
+            self.log("test/mAP", mAP, on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
         
-        
-        stats = calculate_stats(test_preds.cpu().detach().numpy(), test_targets.cpu().detach().numpy())
-        mAP = np.mean([stat['AP'] for stat in stats])
-        acc = stats[0]['acc']
-        self.test_mAP_best(mAP)
-        
-        #avg_pres = self.ap.compute()
-        #print(avg_pres.shape)
-        self.log("test/mAP", mAP, on_step=False, on_epoch=True, prog_bar=True,rank_zero_only=True)
-        self.log("test/mAP_best", self.test_mAP_best.compute(), on_step=False, on_epoch=True, prog_bar=True,rank_zero_only=True)
-        #self.log("val/mAP",self.ap.compute().mean(),on_step=False, on_epoch=True, prog_bar=True,sync_dist=True)
-        self.test_predictions.clear()
-        self.test_targets.clear()
         
       
         

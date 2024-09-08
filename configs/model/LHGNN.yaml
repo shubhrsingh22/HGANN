@@ -3,7 +3,7 @@ _target_: src.models.tagging_module.TaggingModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 5e-4
+  lr: 1e-3
   weight_decay: 5e-7
   eps: 1e-8
   betas: [0.95, 0.999]
@@ -19,7 +19,7 @@ scheduler:
  
 net:
   _target_: src.models.components.LHGNN.LHGNN
-  k: 25
+  k: 25 
   act: 'gelu'
   norm: 'batch'
   bias: True
@@ -28,7 +28,7 @@ net:
   epsilon: 0.2
   drop_path: 0.1
   size: 's'
-  num_class: 527
+  num_class: 200
   emb_dims: 1024
   freq_num: 128
   time_num: 1024

@@ -6,7 +6,7 @@ min_epochs: 50 # prevents early stopping
 max_epochs: 50 
 
 accelerator: gpu
-devices: 4
+devices: 8
 gradient_clip_val: 0.5
 # mixed precision for extra speed-up
 precision: 16
@@ -17,10 +17,11 @@ check_val_every_n_epoch: 1
 # set True to to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
 deterministic: False
-strategy:  ddp_spawn #auto
+strategy:  ddp #auto
 num_nodes: 1
 sync_batchnorm: True
-use_distributed_sampler: True  
+use_distributed_sampler: False
+
 
 
 

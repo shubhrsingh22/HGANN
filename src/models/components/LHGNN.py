@@ -129,7 +129,7 @@ class LHGNN(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
                     m.bias.requires_grad = True
-                
+              
     def forward(self,inputs):
         
         inputs = inputs.unsqueeze(1)
@@ -147,9 +147,9 @@ class LHGNN(nn.Module):
         
         x = self.prediction(x)
             
-        preds = torch.sigmoid(x)
+        #preds = torch.sigmoid(x)
         
-        preds = preds.squeeze(-1).squeeze(-1)
+        preds = x.squeeze(-1).squeeze(-1)
         
             
         
